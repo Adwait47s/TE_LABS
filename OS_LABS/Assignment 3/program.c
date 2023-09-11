@@ -1,424 +1,559 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <cstring>
+#include <limits.h>
 
-const int N = 1001;
+#define MAX_SIZE 1000
+
+// Structure to represent a process
 int process[1001];
 int time[1001];
-int vis[1001];
-int sysprocess[1001];
 int size = 0;
-int arrival_time[N], burst_time[N], priority[N];
-void prnt()
+int upto = 0;
+
+struct Process
 {
-    for (int i = 0; i < size - 1; i++)
+  int id;
+  int arrival_time;
+  int burst_time;
+  int priority;
+  int remaining_time;
+  int waiting_time;
+  int turnaround_time;
+  bool completed;
+};
+
+
+// Structure to represent the queue
+typedef struct {
+  int array[MAX_SIZE];
+  int front;
+  int rear;
+} Queue;
+
+// Function to create a new empty queue
+Queue* createQueue() {
+  Queue* queue = (Queue*)malloc(sizeof(Queue));
+  if (queue == NULL) {
+    perror("Memory allocation failed");
+    exit(EXIT_FAILURE);
+  }
+  queue->front = -1;
+  queue->rear = -1;
+  return queue;
+}
+
+// Function to check if the queue is empty
+int isEmpty(Queue* queue) {
+  return (queue->front == -1 && queue->rear == -1);
+}
+
+// Function to check if the queue is full
+int isFull(Queue* queue) {
+  return (queue->rear + 1) % MAX_SIZE == queue->front;
+}
+
+// Function to enqueue an element
+void push(Queue* queue, int value) {
+  if (isFull(queue)) {
+    printf("Queue is full. Enqueue operation failed.\n");
+    return;
+  }
+  if (isEmpty(queue)) {
+    queue->front = 0;
+    queue->rear = 0;
+  } else {
+    queue->rear = (queue->rear + 1) % MAX_SIZE;
+  }
+  queue->array[queue->rear] = value;
+}
+
+// Function to dequeue an element
+int pop(Queue* queue) {
+  int value;
+  if (isEmpty(queue)) {
+    printf("Queue is empty. Dequeue operation failed.\n");
+    exit(EXIT_FAILURE);
+  }
+  value = queue->array[queue->front];
+  if (queue->front == queue->rear) {
+        // Last element in the queue
+    queue->front = -1;
+    queue->rear = -1;
+  } else {
+    queue->front = (queue->front + 1) % MAX_SIZE;
+  }
+  return value;
+}
+
+// Function to get the front element of the queue without removing it
+int front(Queue* queue) {
+  if (isEmpty(queue)) {
+    printf("Queue is empty. Front operation failed.\n");
+    exit(EXIT_FAILURE);
+  }
+  return queue->array[queue->front];
+}
+
+void prnt(struct Process processes[])
+{
+  printf("\n\n");
+  int now = 0;
+  for (int i = 0; i <= upto; i++)
+  {
+    if (i == 0)
     {
-        printf("%d-", time[i]);
-        printf("%d  =  ", time[i + 1]);
-        printf("%d\n", process[i]);
+      printf("+");
+      if (time[now] == i)
+      {
+        now++;
+      }
+    }
+    else if (time[now] == i)
+    {
+      printf("+");
+      now++;
+    }
+    else
+    {
+      printf(".");
+    }
+  }
+
+  printf("\n");
+  now = 0;
+  int curr = (time[0] + time[1]) / 2;
+  for (int i = 0; i <= upto; i++)
+  {
+    // +......
+    // |
+    // +.....
+
+    if (i == 0)
+    {
+      printf("|");
+      if (time[now] == i)
+      {
+        now++;
+        curr = (time[now] + time[now - 1]) / 2;
+      }
+    }
+    else if (time[now] == i)
+    {
+      printf("|");
+      now++;
+      curr = (time[now] + time[now - 1]) / 2;
+    }
+    else if (curr == i)
+    {
+      printf("%d", process[now - 1]);
+    }
+    else
+    {
+      printf(" ");
+    }
+  }
+
+  printf("\n");
+  now = 0;
+  for (int i = 0; i <= upto; i++)
+  {
+    if (i == 0)
+    {
+      printf("+");
+      if (time[now] == i)
+      {
+        now++;
+      }
+    }
+    else if (time[now] == i)
+    {
+      printf("+");
+      now++;
+    }
+    else
+    {
+      printf(".");
+    }
+  }
+
+  printf("\n");
+  now = 0;
+  for (int i = 0; i <= upto; i++)
+  {
+    if (time[now] == i)
+    {
+      printf("%d", i);
+      now++;
+    }
+    else
+    {
+      printf(" ");
+    }
+  }
+
+  printf("\n\n");
+  now = 1;
+  for (int j = 0; j < size; j++)
+  {
+    for (int i = 0; i < size; i++)
+    {
+      if (now == processes[i].id)
+      {
+        printf("Process");
+        printf(" %d", now);
+        printf(" AT: %d  ", processes[i].arrival_time);
+        printf(" BT:  %d ", processes[i].burst_time);
+        printf(" TAT: %d  ", processes[i].turnaround_time);
+        printf(" WT:  %d \n", processes[i].waiting_time);
+        now++;
+        break;
+      }
+
     }
 
-    printf("\n\n");
-    int upto = time[size - 1];
-    int now = 0;
-    for (int i = 0; i <= upto; i++)
-    {
-        if (i == 0)
-        {
-            printf("+");
-            if (time[now] == i)
-            {
-                now++;
-            }
-        }
-        else if (time[now] == i)
-        {
-            printf("+");
-            now++;
-        }
-        else
-        {
-            printf(".");
-        }
-    }
+  }
+}
 
-    printf("\n");
-    now = 0;
-    int curr = (time[0] + time[1]) / 2;
-    for (int i = 0; i <= upto; i++)
-    {
-        // +......
-        // |
-        // +.....
+// Function to find the process with the shortest remaining time
+int findShortestJob(struct Process processes[], int n, int current_time, int choice)
+{
+  int shortest_job_index = -1;
+  int shortest_time = INT_MAX;
 
-        if (i == 0)
-        {
-            printf("|");
-            if (time[now] == i)
-            {
-                now++;
-                curr = (time[now] + time[now - 1]) / 2;
-            }
-        }
-        else if (time[now] == i)
-        {
-            printf("|");
-            now++;
-            curr = (time[now] + time[now - 1]) / 2;
-        }
-        else if (curr == i)
-        {
-            printf("%d", process[now - 1]);
-        }
-        else
-        {
-            printf(" ");
-        }
-    }
-
-    printf("\n");
-    now = 0;
-    for (int i = 0; i <= upto; i++)
+  if(choice==2||choice==3){
+    for (int i = 0; i < n; i++)
     {
-        if (i == 0)
-        {
-            printf("+");
-            if (time[now] == i)
-            {
-                now++;
-            }
-        }
-        else if (time[now] == i)
-        {
-            printf("+");
-            now++;
-        }
-        else
-        {
-            printf(".");
-        }
+      if (!processes[i].completed && processes[i].arrival_time <= current_time && processes[i].remaining_time < shortest_time)
+      {
+        shortest_time = processes[i].remaining_time;
+        shortest_job_index = i;
+      }
     }
-
-    printf("\n");
-    now = 0;
-    for (int i = 0; i <= upto; i++)
+  }
+  else if(choice==1){
+    for (int i = 0; i < n; i++)
     {
-        if (time[now] == i)
-        {
-            printf("%d", i);
-            now++;
-        }
-        else
-        {
-            printf(" ");
-        }
-    }
+      if (!processes[i].completed && processes[i].arrival_time <= current_time && processes[i].arrival_time< shortest_time )
+      {
 
-    printf("\n\n");
-    now = 1;
-    for (int j = 0; j < size; j++)
-    {
-        for (int i = 0; i < size; i++)
-        {
-            if (now == process[i])
-            {
-                printf("Process");
-                printf(" %d", now);
-                printf(" AT: %d  ", arrival_time[j]);
-                printf(" BT:  %d ", burst_time[j]);
-                int tat = time[i + 1] - arrival_time[j];
-                printf(" TAT: %d  ", tat);
-                printf(" WT:  %d \n", tat - burst_time[j]);
-                now++;
-                break;
-            }
-        }
+        shortest_time = processes[i].arrival_time;
+        shortest_job_index = i;
+      }
     }
+  }
+  else if(choice==4||choice==5){
+    for (int i = 0; i < n; i++)
+    {
+      if (!processes[i].completed && processes[i].arrival_time <= current_time && processes[i].priority < shortest_time)
+      {
+        shortest_time = processes[i].priority;
+        shortest_job_index = i;
+      }
+    }
+  }
+  
+  return shortest_job_index;
 }
 
 int main()
 {
-    int n;
-    printf("Enter the number of processes in the array: ");
-    scanf("%d", &n);
+  int n;
+  printf("Enter the number of processes: ");
+  scanf("%d", &n);
 
-    printf("Enter the arrival time of each process : ");
+  struct Process processes[n];
 
-    for (int i = 0; i < n; i++)
-    {
-        scanf("%d", &arrival_time[i]);
-    }
+  // Input process details
+  for (int i = 0; i < n; i++)
+  {
+    processes[i].id = i + 1;
+    printf("Enter arrival time and burst time for process P%d: ", processes[i].id);
+    scanf("%d %d %d", &processes[i].arrival_time, &processes[i].burst_time, &processes[i].priority);
+    processes[i].remaining_time = processes[i].burst_time;
+    processes[i].completed = false;
+  }
+  
+  int quantum;
+  
+  printf("Please enter the time quantum\n");
+  scanf("%d" , &quantum);
 
-    printf("Enter the burst time of each process : ");
+  while (1)
+  {
+    printf("----------MENU------------\n\n");
+    printf("1) First come first serve\n");
+    printf("2) SJF Preamptive\n");
+    printf("3) SJF Non Preamptive\n");
+    printf("4) Priority preeamptive\n");
+    printf("5) Priority non preeamptive\n");
+    printf("6) Round Robin\n");
+    printf("7) Exit\n");
+    printf("\n");
+    printf("Please make a choice\n");
+    int choice;
+    scanf("%d", &choice);
 
-    for (int i = 0; i < n; i++)
-    {
-        scanf("%d", &burst_time[i]);
-    }
-
-    printf("Enter the priority of each process : ");
-
-    for (int i = 0; i < n; i++)
-    {
-        scanf("%d", &priority[i]);
-    }
-
-    printf("Enter the quantum time  : ");
-
-    int qt;
-
-    scanf("%d", &qt);
-
-    while (1)
-    {
-        printf("----------MENU------------\n\n");
-        printf("1.First Come First Serve\n");
-        printf("2.Shortest Job First\n");
-        printf("3.Round Robin \n");
-        printf("\n");
-        printf("Please make a choice\n");
-        printf("\n\n");
-        int choice;
-        scanf("%d", &choice);
-        int currT = 1, currP = 0;
-        time[0] = 0;
-        if (choice == 1)
-        {
-            int cnt = 0;
-            while (cnt <= n)
-            {
-                int ans = N;
-                int pr = 0;
-                for (int i = 0; i < n; i++)
-                {
-                    if (ans > arrival_time[i] && vis[i] == 0)
-                    {
-                        ans = arrival_time[i];
-                        pr = i;
-                    }
-                }
-
-                vis[pr] = 1;
-
-                if (time[currT - 1] >= arrival_time[pr])
-                {
-                    time[currT] = time[currT - 1] + burst_time[pr];
-                    process[currP] = pr + 1;
-                    currT++;
-                    currP++;
-                    size++;
-                }
-                else
-                {
-                    time[currT] = arrival_time[pr];
-                    process[currP] = -1;
-                    currT++;
-                    currP++;
-                    time[currT] = time[currT - 1] + burst_time[pr];
-                    process[currP] = pr + 1;
-                    currT++;
-                    currP++;
-                    size += 2;
-                }
-
-                cnt++;
-            }
-
-            prnt();
-        }
-        else if (choice == 2)
-        {
-            memset(process, 0, sizeof(process));
-            memset(time, 0, sizeof(time));
-            memset(vis, 0, sizeof(vis));
-            size = 0;
-            currT = 1, currP = 0;
-            int cnt = 0;
-            time[0] = 0;
-
-            while (cnt <= n)
-            {
-                int timetillnow = time[currT - 1];
-                int pr = -1;
-                int bt = 1001;  // burst time of that process
-                int mininum_next = 1001;
-                int prnext = -1;
-                for (int i = 0; i < n; i++)
-                {
-                    if (timetillnow >= arrival_time[i] && vis[i] == 0)
-                    {
-                        if (burst_time[i] < bt)
-                        {
-                            pr = i;
-                            bt = burst_time[i];
-                        }
-                    }
-                    else if (timetillnow < arrival_time[i] && vis[i] == 0)
-                    {
-                        if (mininum_next > arrival_time[i])
-                        {
-                            prnext = i;
-                            mininum_next = arrival_time[i];
-                        }
-                    }
-                }
-
-                vis[pr] = 1;
-
-                if (pr != -1)
-                {
-                    time[currT] = time[currT - 1] + burst_time[pr];
-                    process[currP] = pr + 1;
-                    currT++;
-                    currP++;
-                    size++;
-                }
-                else
-                {
-                    time[currT] = arrival_time[pr];
-                    process[currP] = -1;
-                    currT++;
-                    currP++;
-                    time[currT] = time[currT - 1] + burst_time[pr];
-                    process[currP] = pr + 1;
-                    currT++;
-                    currP++;
-                    size += 2;
-                }
-
-                cnt++;
-            }
-
-            size--;
-            prnt();
-        }
-        else if (choice == 3)
-{
-    memset(process, 0, sizeof(process));
-    memset(time, 0, sizeof(time));
-    memset(vis, 0, sizeof(vis));
-    size = 0;
-    currT = 1, currP = 0;
-    int cnt = 0;
-    int remaining_burst_time[N];
-    int current_processes[N]; // Array to store currently executing processes
-    int current_count = 0; // Count of currently executing processes
+    int current_time = 0;
+    int completed = 0;
+    int timeline[1000];
+    int timeline_current_time = 0;
 
     for (int i = 0; i < n; i++)
     {
-        remaining_burst_time[i] = burst_time[i];
+      processes[i].remaining_time = processes[i].burst_time;
+      processes[i].completed = false;
     }
 
-    time[0] = 0;
+    if (choice == 1) {
 
-    while (cnt < n)
-    {   
-        int flag=0;
-        
+      while(completed < n){
+        int shortest_job_index = findShortestJob(processes,n,current_time,1);
+        if(shortest_job_index == -1){
+          timeline[timeline_current_time] = -1;
+          timeline_current_time++;
+          current_time++;
+        }
+        else{
 
-        // Add new arriving processes to the current_processes array
-        for (int i = 0; i < n; i++)
-        {
-            if (remaining_burst_time[i] > 0 && arrival_time[i] <= time[currT - 1])
-            {
-                int exists = 0;
-                for (int j = 0; j < current_count; j++)
-                {
-                    if (current_processes[j] == i)
-                    {
-                        exists = 1;
-                        break;
-                    }
-                }
-                if (!exists)
-                {
-                    current_processes[current_count] = i;
-                    current_count++;
-                }
-            }
-        }
-        int prr = current_processes[0];
-         for (int i = 0; i < current_count - 1; i++)
-            {
-                current_processes[i] = current_processes[i + 1];
-            }
-            current_processes[current_count - 1] = prr;
+          for(int i=0;i<processes[shortest_job_index].burst_time;i++){
+            timeline[timeline_current_time]=processes[shortest_job_index].id;
+            timeline_current_time++;
+          }
 
-        // Remove completed processes from the current_processes array
-        for (int i = 0; i < current_count; i++)
-        {
-            if (remaining_burst_time[current_processes[i]] == 0)
-            {
-                flag=1;
-                for (int j = i; j < current_count - 1; j++)
-                {
-                    current_processes[j] = current_processes[j + 1];
-                }
-                current_count--;
-                i--;
-            }
-        }
+          current_time+= processes[shortest_job_index].burst_time;
+          processes[shortest_job_index].completed= 1;
+          completed++;
+          int completion_time = current_time ;
 
-        if (current_count == 0)
-        {
-            time[currT] = arrival_time[currP];
-            process[currP] = -1;
-            currT++;
-            currP++;
+          processes[shortest_job_index].remaining_time =0;
+          processes[shortest_job_index].turnaround_time = completion_time - processes[shortest_job_index].arrival_time;
+          processes[shortest_job_index].waiting_time = processes[shortest_job_index].turnaround_time - processes[shortest_job_index].burst_time;
+          printf("[P%d] -> %d\n", processes[shortest_job_index].id, completion_time);
         }
-        else
-        {
-            int pr = current_processes[0];
-        process[currP]=pr+1;
-        currP++;
-            printf("burst time of cp : %d %d \n",pr+1,remaining_burst_time[pr]);
-            if (remaining_burst_time[pr] <= qt)
-            {
-                time[currT] = time[currT - 1] + remaining_burst_time[pr];
-                size++;
-                currT++;
-                remaining_burst_time[pr] = 0;
-                cnt++;
-            }
-            else
-            {
-                time[currT] = time[currT - 1] + qt;
-                size++;
-                currT++;
-                remaining_burst_time[pr] -= qt;
-            }
-            printf("burst time of cp : %d %d \n",pr+1,remaining_burst_time[pr]);
-            // Move the executed process to the end of the array
-           
-            
-        }
-        
-        for(int i=0;i<current_count;i++){
-                printf("%d " , current_processes[i]+1);
-            }
-            printf("\n");
-        
+      }
     }
+    else if (choice == 2) {
 
-    prnt();
-}
-        else
-        {
-            break;
+      while (completed < n) {
+        int shortest_job_index = findShortestJob(processes, n, current_time,choice);
+
+        if (shortest_job_index == -1) {
+          timeline[timeline_current_time] = -1;
+          current_time++;
+        } 
+        else {
+          processes[shortest_job_index].remaining_time--;
+          timeline[timeline_current_time] = processes[shortest_job_index].id;
+
+          if (processes[shortest_job_index].remaining_time == 0) {
+            completed++;
+            processes[shortest_job_index].completed = true;
+            int completion_time = current_time + 1;
+            processes[shortest_job_index].turnaround_time = completion_time - processes[shortest_job_index].arrival_time;
+            processes[shortest_job_index].waiting_time = processes[shortest_job_index].turnaround_time - processes[shortest_job_index].burst_time;
+            printf("[P%d] -> %d\n", processes[shortest_job_index].id, completion_time);
+          }
+
+          current_time++;
+          timeline_current_time++;
+        }
+      }
+    }
+    else if (choice == 3) {
+      while(completed < n){
+        int shortest_job_index = findShortestJob(processes,n,current_time,choice);
+        if(shortest_job_index == -1){
+          timeline[timeline_current_time] = -1;
+          timeline_current_time++;
+          current_time++;
+        }
+        else{
+
+          for(int i=0;i<processes[shortest_job_index].burst_time;i++){
+            timeline[timeline_current_time]=processes[shortest_job_index].id;
+            timeline_current_time++;
+          }
+
+          current_time+= processes[shortest_job_index].burst_time;
+          processes[shortest_job_index].completed= 1;
+          completed++;
+          int completion_time = current_time ;
+
+          processes[shortest_job_index].remaining_time =0;
+          processes[shortest_job_index].turnaround_time = completion_time - processes[shortest_job_index].arrival_time;
+          processes[shortest_job_index].waiting_time = processes[shortest_job_index].turnaround_time - processes[shortest_job_index].burst_time;
+          printf("[P%d] -> %d\n", processes[shortest_job_index].id, completion_time);
+        }
+      }
+    }
+    else if (choice == 4) {
+
+      while (completed < n) {
+        int shortest_job_index = findShortestJob(processes, n, current_time,choice);
+
+        if (shortest_job_index == -1) {
+          timeline[timeline_current_time] = -1;
+          current_time++;
+        } 
+        else {
+          processes[shortest_job_index].remaining_time--;
+          timeline[timeline_current_time] = processes[shortest_job_index].id;
+
+          if (processes[shortest_job_index].remaining_time == 0) {
+            completed++;
+            processes[shortest_job_index].completed = true;
+            int completion_time = current_time + 1;
+            processes[shortest_job_index].turnaround_time = completion_time - processes[shortest_job_index].arrival_time;
+            processes[shortest_job_index].waiting_time = processes[shortest_job_index].turnaround_time - processes[shortest_job_index].burst_time;
+            printf("[P%d] -> %d\n", processes[shortest_job_index].id, completion_time);
+          }
+
+          current_time++;
+          timeline_current_time++;
+        }
+      }
+    }
+    else if (choice == 5) {
+      while(completed < n){
+        int shortest_job_index = findShortestJob(processes,n,current_time,choice);
+        if(shortest_job_index == -1){
+          timeline[timeline_current_time] = -1;
+          timeline_current_time++;
+          current_time++;
+        }
+        else{
+
+          for(int i=0;i<processes[shortest_job_index].burst_time;i++){
+            timeline[timeline_current_time]=processes[shortest_job_index].id;
+            timeline_current_time++;
+          }
+
+          current_time+= processes[shortest_job_index].burst_time;
+          processes[shortest_job_index].completed= 1;
+          completed++;
+          int completion_time = current_time ;
+
+          processes[shortest_job_index].remaining_time =0;
+          processes[shortest_job_index].turnaround_time = completion_time - processes[shortest_job_index].arrival_time;
+          processes[shortest_job_index].waiting_time = processes[shortest_job_index].turnaround_time - processes[shortest_job_index].burst_time;
+          printf("[P%d] -> %d\n", processes[shortest_job_index].id, completion_time);
+        }
+      }
+    }
+    else if (choice == 6) {
+      Queue* rrQueue = createQueue();
+      int timeQuantum = quantum;
+      int currentTime = 0;
+      int completed = 0;
+      int* burstTimeCopy = (int*)malloc(n * sizeof(int));
+
+      for (int i = 0; i < n; i++) {
+        burstTimeCopy[i] = processes[i].burst_time;
+      }
+
+      while (completed < n) {
+        for (int i = 0; i < n; i++) {
+          if (processes[i].arrival_time <= currentTime && burstTimeCopy[i] > 0) {
+            int executeTime = (burstTimeCopy[i] < timeQuantum) ? burstTimeCopy[i] : timeQuantum;
+
+                // Execute the process for the time quantum or until it finishes
+            for (int j = 0; j < executeTime; j++) {
+              timeline[timeline_current_time] = processes[i].id;
+              timeline_current_time++;
+            }
+
+            burstTimeCopy[i] -= executeTime;
+            currentTime += executeTime;
+
+            if (burstTimeCopy[i] == 0) {
+              completed++;
+              processes[i].completed = true;
+              int completionTime = currentTime;
+              processes[i].turnaround_time = completionTime - processes[i].arrival_time;
+              processes[i].waiting_time = processes[i].turnaround_time - processes[i].burst_time;
+              printf("[P%d] -> %d\n", processes[i].id, completionTime);
+            } else {
+                    push(rrQueue, i);  // Enqueue the process back into the queue
+                  }
+                }
+              }
+
+              if (!isEmpty(rrQueue)) {
+                int frontProcessIndex = front(rrQueue);
+            pop(rrQueue);  // Dequeue the front process
+
+            // Enqueue it back after processing other ready processes
+            push(rrQueue, frontProcessIndex);
+          } else {
+            timeline[timeline_current_time] = -1;  // Idle time
+            timeline_current_time++;
+            currentTime++;
+          }
         }
 
-        printf("\n\n");
-    }
-}
+        free(burstTimeCopy);
+        free(rrQueue);
+      }
 
-// intput 
+      else if (choice == 7) {
+        break;
+      }
+      else {
+        printf("Wrong choice\n");
+      }
+      if(choice<=6){
+        float avg_waiting_time = 0.0;
+        float avg_turnaround_time = 0.0;
+        for (int i = 0; i < n; i++) {
+          avg_waiting_time += processes[i].waiting_time;
+          avg_turnaround_time += processes[i].turnaround_time;
+        }
+
+
+
+        size=1;
+        time[0]=0;
+        int cnt=0;
+      // for(int i=0;i<timeline_current_time;i++){
+      //   printf(" %d", timeline[i]);
+      // }
+
+        for(int i=0;i<timeline_current_time;i++){
+          cnt++;
+          if(timeline[i]!=timeline[i+1]){
+            time[size] = cnt;
+            process[size-1] = timeline[i];
+            size++;
+          }
+        }
+        if(time[size-1]!=timeline[timeline_current_time-1]){
+          time[size] = cnt;
+          process[size-1] = timeline[size-1];
+          size++;
+        }
+        size--;
+        upto = timeline_current_time;
+
+        prnt(processes);
+
+        avg_waiting_time /= n;
+        avg_turnaround_time /= n;
+
+        printf("\n\nAverage Waiting Time: %.2f\n", avg_waiting_time);
+        printf("Average Turnaround Time: %.2f\n\n", avg_turnaround_time);
+      }
+    }
+  }
+
+// intput
 // 5
 // 8 4 0 16 10
 // 2 7 13 5 15
 // 5 3 4 1 2
-// 0 0 0 0 0
+// 4
 // 1
+// 2
 // 3
