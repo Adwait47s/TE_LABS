@@ -281,6 +281,17 @@ int main()
   printf("Please enter the time quantum\n");
   scanf("%d" , &quantum);
 
+  // sort the process with the acending order wrt arrival time
+  for(int i=0;i<n;i++){
+    for(int j=0;j<n-1;j++){
+      if(processes[j].arrival_time>processes[j+1].arrival_time){
+        struct Process temp = processes[j];
+        processes[j] = processes[j+1];
+        processes[j+1] = temp;
+      }
+    }
+  }
+
   while (1)
   {
     printf("----------MENU------------\n\n");
@@ -292,7 +303,7 @@ int main()
     printf("6) Round Robin\n");
     printf("7) Exit\n");
     printf("\n");
-    printf("Please make a choice\n");
+    printf("Please make a choice\n\n");
     int choice;
     scanf("%d", &choice);
 
@@ -306,7 +317,7 @@ int main()
       processes[i].remaining_time = processes[i].burst_time;
       processes[i].completed = false;
     }
-
+    printf("Completion Time for each Process\n");
     if (choice == 1) {
 
       while(completed < n){
@@ -449,104 +460,113 @@ int main()
       int currentTime = 0;
       int completed = 0;
       int* burstTimeCopy = (int*)malloc(n * sizeof(int));
+      int taken[n];
 
       for (int i = 0; i < n; i++) {
         burstTimeCopy[i] = processes[i].burst_time;
+        taken[i]=0;
       }
-
+      int process_executed_now=-1;
       while (completed < n) {
+
         for (int i = 0; i < n; i++) {
-          if (processes[i].arrival_time <= currentTime && burstTimeCopy[i] > 0) {
-            int executeTime = (burstTimeCopy[i] < timeQuantum) ? burstTimeCopy[i] : timeQuantum;
-
-                // Execute the process for the time quantum or until it finishes
-            for (int j = 0; j < executeTime; j++) {
-              timeline[timeline_current_time] = processes[i].id;
-              timeline_current_time++;
-            }
-
-            burstTimeCopy[i] -= executeTime;
-            currentTime += executeTime;
-
-            if (burstTimeCopy[i] == 0) {
-              completed++;
-              processes[i].completed = true;
-              int completionTime = currentTime;
-              processes[i].turnaround_time = completionTime - processes[i].arrival_time;
-              processes[i].waiting_time = processes[i].turnaround_time - processes[i].burst_time;
-              printf("[P%d] -> %d\n", processes[i].id, completionTime);
-            } else {
-                    push(rrQueue, i);  // Enqueue the process back into the queue
-                  }
-                }
-              }
-
-              if (!isEmpty(rrQueue)) {
-                int frontProcessIndex = front(rrQueue);
-            pop(rrQueue);  // Dequeue the front process
-
-            // Enqueue it back after processing other ready processes
-            push(rrQueue, frontProcessIndex);
-          } else {
-            timeline[timeline_current_time] = -1;  // Idle time
-            timeline_current_time++;
-            currentTime++;
+          if (processes[i].arrival_time <= currentTime && burstTimeCopy[i] > 0 && taken[i]==0) {
+              push(rrQueue,i);
+              taken[i]=1;
           }
         }
 
-        free(burstTimeCopy);
-        free(rrQueue);
-      }
-
-      else if (choice == 7) {
-        break;
-      }
-      else {
-        printf("Wrong choice\n");
-      }
-      if(choice<=6){
-        float avg_waiting_time = 0.0;
-        float avg_turnaround_time = 0.0;
-        for (int i = 0; i < n; i++) {
-          avg_waiting_time += processes[i].waiting_time;
-          avg_turnaround_time += processes[i].turnaround_time;
+        if(process_executed_now!=-1){
+          push(rrQueue,process_executed_now);
+        }
+        if(isEmpty(rrQueue)){
+          timeline[timeline_current_time] = -1;
+          timeline_current_time++;
+          current_time++;
+          continue;
         }
 
+        
+        int i = front(rrQueue);
+        int time_to_execute =0;
+
+        if(burstTimeCopy[i]>=quantum){
+          time_to_execute = quantum;
+          process_executed_now =i;
+          currentTime+=quantum;
+        }
+        else{
+          time_to_execute = burstTimeCopy[i];
+          currentTime+=burstTimeCopy[i];
+          processes[i].turnaround_time = currentTime - processes[i].arrival_time;
+          processes[i].waiting_time = processes[i].turnaround_time -  processes[i].burst_time;
+          process_executed_now = -1; // process done so dont put it again in the back of the queue
+          completed++;
+        }
+        burstTimeCopy[i]-=time_to_execute;
+
+        for(int ii=0;ii<time_to_execute;ii++){
+          timeline[timeline_current_time] = processes[i].id;
+          timeline_current_time++;
+        }
+
+        pop(rrQueue);
+
+      }
+
+      free(burstTimeCopy);
+      free(rrQueue);
+    }
+
+    else if (choice == 7) {
+      break;
+    }
+    else {
+      printf("Wrong choice\n");
+    }
+    if(choice<=6){
+      float avg_waiting_time = 0.0;
+      float avg_turnaround_time = 0.0;
+      for (int i = 0; i < n; i++) {
+        avg_waiting_time += processes[i].waiting_time;
+        avg_turnaround_time += processes[i].turnaround_time;
+      }
 
 
-        size=1;
-        time[0]=0;
-        int cnt=0;
+
+      size=1;
+      time[0]=0;
+      int cnt=0;
       // for(int i=0;i<timeline_current_time;i++){
       //   printf(" %d", timeline[i]);
       // }
 
-        for(int i=0;i<timeline_current_time;i++){
-          cnt++;
-          if(timeline[i]!=timeline[i+1]){
-            time[size] = cnt;
-            process[size-1] = timeline[i];
-            size++;
-          }
-        }
-        if(time[size-1]!=timeline[timeline_current_time-1]){
+      for(int i=0;i<timeline_current_time;i++){
+        cnt++;
+        if(timeline[i]!=timeline[i+1]){
           time[size] = cnt;
-          process[size-1] = timeline[size-1];
+          process[size-1] = timeline[i];
           size++;
         }
-        size--;
-        upto = timeline_current_time;
-
-        prnt(processes);
-
-        avg_waiting_time /= n;
-        avg_turnaround_time /= n;
-
-        printf("\n\nAverage Waiting Time: %.2f\n", avg_waiting_time);
-        printf("Average Turnaround Time: %.2f\n\n", avg_turnaround_time);
       }
+      if(time[size-1]!=timeline[timeline_current_time-1]){
+        time[size] = cnt;
+        process[size-1] = timeline[size-1];
+        size++;
+      }
+      size--;
+      upto = timeline_current_time;
+
+      prnt(processes);
+
+      avg_waiting_time /= n;
+      avg_turnaround_time /= n;
+
+      printf("\n\nAverage Waiting Time: %.2f\n", avg_waiting_time);
+      printf("Average Turnaround Time: %.2f\n\n", avg_turnaround_time);
     }
   }
+}
 
 // intput
 // 5
