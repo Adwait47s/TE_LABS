@@ -60,6 +60,27 @@ _print(x)
  */
 vector<char>f1,f2,f3,f4;
 
+int findOptimal(int idx, vector<int>& v, vector<int>& curr) {
+    int n = v.size();
+    int farthest = -1;
+    int farthestIdx = -1;
+    for (int i = 0; i < curr.size(); i++) {
+        int j;
+        for (j = idx; j < n; j++) {
+            if (curr[i] == v[j]) {
+                if (j > farthest) {
+                    farthest = j;
+                    farthestIdx = i;
+                }
+                break;
+            }
+        }
+        if (j == n) return i; // If a page is not used in the future, replace it
+    }
+    return farthestIdx; // Replace the page that will be used farthest in the future
+}
+
+
 void printoutput(){
 
     cout << "F1 : ";
@@ -151,7 +172,7 @@ int main(){
                 //f1
                 //f2
                 //f3
-                f3.push_back(curr[0]+ '0');
+                f1.push_back(curr[0]+ '0');
                 if(curr.size()>1){
                     f2.push_back(curr[1] + '0');
                 }
@@ -159,10 +180,10 @@ int main(){
                     f2.push_back('-');
                 }
                 if(curr.size()>2){
-                    f1.push_back(curr[2]+ '0');
+                    f3.push_back(curr[2]+ '0');
                 }
                 else{
-                    f1.push_back('-');
+                    f3.push_back('-');
                 }
             }
             debug(f1);
@@ -225,8 +246,45 @@ int main(){
             cout << "Page Hits : " << hit << endl;
             cout << "Page Faults : " << fault << endl;
         }
-        else if(choice==3){
-
+        else if (choice == 3) {
+            cout << "Optimal : " << endl;
+            for (int i = 0; i < n; i++) {
+                if (s.count(v[i])) {
+                    hit++;
+                    f4.push_back('1');
+                } else {
+                    fault++;
+                    f4.push_back('0');
+                    if (curr.size() < 3) {
+                        curr.push_back(v[i]);
+                    } else {
+                        int replaceIdx = findOptimal(i, v, curr);
+                        s.erase(curr[replaceIdx]);
+                        curr[replaceIdx] = v[i];
+                    }
+                    s.insert(v[i]);
+                }
+            // f1
+            // f2
+            // f3
+                f1.push_back(curr[0] + '0');
+                if (curr.size() > 1) {
+                    f2.push_back(curr[1] + '0');
+                } else {
+                    f2.push_back('-');
+                }
+                if (curr.size() > 2) {
+                    f3.push_back(curr[2] + '0');
+                } else {
+                    f3.push_back('-');
+                }
+            }
+            debug(f1);
+            debug(f2);
+            debug(f3);
+            printoutput();
+            cout << "Page Hits : " << hit << endl;
+            cout << "Page Faults : " << fault << endl;
         }
         else if(choice==4){
             cout << "Exiting the code..." << endl;
